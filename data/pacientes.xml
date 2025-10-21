@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pacientes>
+    <paciente>
+        <id>602880095</id>
+        <tipo>PACIENTE</tipo>
+        <nombre>Ania</nombre>
+        <telefono>60035669</telefono>
+        <fechaNacimiento>1977-12-12</fechaNacimiento>
+    </paciente>
+    <paciente>
+        <id>602150650</id>
+        <tipo>PACIENTE</tipo>
+        <nombre>Esther</nombre>
+        <telefono>84277972</telefono>
+        <fechaNacimiento>1970-15-06</fechaNacimiento>
+    </paciente>
+    <paciente>
+        <id>602880180</id>
+        <tipo>PACIENTE</tipo>
+        <nombre>Helen</nombre>
+        <telefono>87766837</telefono>
+        <fechaNacimiento>1980-15-09</fechaNacimiento>
+    </paciente>
+</pacientes>

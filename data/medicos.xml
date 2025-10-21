@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<medicos>
+    <medico>
+        <id>604720874</id>
+        <clave>604720874</clave>
+        <tipo>MEDICO</tipo>
+        <nombre>Brayan</nombre>
+        <especialidad>Cardiologia</especialidad>
+    </medico>
+    <medico>
+        <id>777777777</id>
+        <clave>User123</clave>
+        <tipo>MEDICO</tipo>
+        <nombre>Allan</nombre>
+        <especialidad>Neurologo</especialidad>
+    </medico>
+</medicos>

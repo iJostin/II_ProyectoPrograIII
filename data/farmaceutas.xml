@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<farmaceutas>
+    <farmaceuta>
+        <id>801370342</id>
+        <clave>801370342</clave>
+        <tipo>FARMACEUTA</tipo>
+        <nombre>Lesber</nombre>
+    </farmaceuta>
+    <farmaceuta>
+        <id>888888888</id>
+        <clave>888888888</clave>
+        <tipo>FARMACEUTA</tipo>
+        <nombre>Jose</nombre>
+    </farmaceuta>
+</farmaceutas>

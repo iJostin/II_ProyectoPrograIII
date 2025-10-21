@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<medicamentos>
+    <medicamento>
+        <codigo>1</codigo>
+        <nombre>Acetaminofen</nombre>
+        <presentacion>500 mg</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>2</codigo>
+        <nombre>Ibuprofeno</nombre>
+        <presentacion>400 mg</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>3</codigo>
+        <nombre>Amoxicilina</nombre>
+        <presentacion>500 mg cápsulas</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>4</codigo>
+        <nombre>Loratadina</nombre>
+        <presentacion>10 mg tabletas</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>5</codigo>
+        <nombre>Metformina</nombre>
+        <presentacion>850 mg tabletas</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>6</codigo>
+        <nombre>Omeprazol</nombre>
+        <presentacion>20 mg cápsulas</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>7</codigo>
+        <nombre>Diclofenaco</nombre>
+        <presentacion>50 mg tabletas</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>8</codigo>
+        <nombre>Losartan</nombre>
+        <presentacion>50 mg tabletas</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>9</codigo>
+        <nombre>Paracetamol</nombre>
+        <presentacion>650 mg tabletas</presentacion>
+    </medicamento>
+    <medicamento>
+        <codigo>10</codigo>
+        <nombre>Azitromicina</nombre>
+        <presentacion>500 mg tabletas</presentacion>
+    </medicamento>
+</medicamentos>
+
