@@ -1,116 +1,207 @@
 package persistence;
 
 import model.Paciente;
-import util.XMLHelper;
-import java.io.File;
+import util.DatabaseConnection;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Data Access Object (DAO) para gestionar la persistencia de pacientes
- * Utiliza archivos XML para almacenar los datos
- */
+
 public class PacienteDAO {
-    private static final String ARCHIVO = "data/pacientes.xml";
-    private List<Paciente> pacientes;
 
-    /**
-     * Constructor que inicializa el DAO y carga los datos existentes
-     * Crea el directorio data si no existe
-     */
-    public PacienteDAO() {
-        // Crear directorio si no existe
-        new File("data").mkdirs();
-        pacientes = cargar();
-    }
+    // ===== AGREGAR =====
+    public void agregar(Paciente paciente) throws SQLException {
+        String sqlUsuario = "INSERT INTO usuarios (id, clave, tipo) VALUES (?, ?, 'PACIENTE')";
+        String sqlPaciente = "INSERT INTO pacientes (id, nombre, fecha_nacimiento, telefono) " +
+                "VALUES (?, ?, ?, ?)";
 
-    /**
-     * Agrega un nuevo paciente al sistema
-     * @param paciente Objeto Paciente a agregar
-     * @throws IllegalArgumentException Si ya existe un paciente con el mismo ID
-     */
-    public void agregar(Paciente paciente) {
-        if (buscarPorId(paciente.getId()) == null) {
-            pacientes.add(paciente);
-            guardar();
-        } else {
-            throw new IllegalArgumentException("Ya existe un paciente con el ID: " + paciente.getId());
-        }
-    }
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            DatabaseConnection.beginTransaction();
 
-    /**
-     * Busca un paciente por su ID
-     * @param id ID del paciente a buscar
-     * @return Objeto Paciente encontrado o null si no existe
-     */
-    public Paciente buscarPorId(String id) {
-        return pacientes.stream()
-                .filter(paciente -> paciente.getId().equalsIgnoreCase(id))
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * Obtiene todos los pacientes del sistema
-     * @return Lista de todos los pacientes (copia para evitar modificaciones externas)
-     */
-    public List<Paciente> getTodos() {
-        return new ArrayList<>(pacientes); // Retorna copia para evitar modificaciones externas
-    }
-
-    /**
-     * Elimina un paciente por su ID
-     * @param id ID del paciente a eliminar
-     * @throws IllegalArgumentException Si no se encuentra un paciente con el ID especificado
-     */
-    public void eliminar(String id) {
-        boolean removido = pacientes.removeIf(paciente -> paciente.getId().equalsIgnoreCase(id));
-        if (removido) {
-            guardar();
-        } else {
-            throw new IllegalArgumentException("No se encontró un paciente con el ID: " + id);
-        }
-    }
-
-    /**
-     * Actualiza la información de un paciente existente
-     * @param nuevo Objeto Paciente con la información actualizada
-     * @throws IllegalArgumentException Si no se encuentra un paciente con el ID especificado
-     */
-    public void actualizar(Paciente nuevo) {
-        for (int i = 0; i < pacientes.size(); i++) {
-            if (pacientes.get(i).getId().equalsIgnoreCase(nuevo.getId())) {
-                pacientes.set(i, nuevo);
-                guardar();
-                return;
+            // Insertar en usuarios
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlUsuario)) {
+                pstmt.setString(1, paciente.getId());
+                pstmt.setString(2, paciente.getClave());
+                pstmt.executeUpdate();
             }
+
+            // Insertar en pacientes
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlPaciente)) {
+                pstmt.setString(1, paciente.getId());
+                pstmt.setString(2, paciente.getNombre());
+                pstmt.setDate(3, Date.valueOf(paciente.getFechaNacimiento()));
+                pstmt.setString(4, paciente.getTelefono());
+                pstmt.executeUpdate();
+            }
+
+            DatabaseConnection.commitTransaction();
+            System.out.println("✅ Paciente agregado: " + paciente.getId());
+
+        } catch (SQLException e) {
+            DatabaseConnection.rollbackTransaction();
+            throw new SQLException("No se pudo agregar el paciente: " + e.getMessage(), e);
         }
-        throw new IllegalArgumentException("No se encontró un paciente con el ID: " + nuevo.getId());
     }
 
-    /**
-     * Guarda la lista de pacientes en el archivo XML
-     */
-    private void guardar() {
+    // ===== BUSCAR POR ID =====
+    public Paciente buscarPorId(String id) {
+        String sql = "SELECT u.id, u.clave, p.nombre, p.fecha_nacimiento, p.telefono " +
+                "FROM usuarios u " +
+                "INNER JOIN pacientes p ON u.id = p.id " +
+                "WHERE u.id = ? AND u.tipo = 'PACIENTE'";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, id);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    Paciente paciente = new Paciente();
+                    paciente.setId(rs.getString("id"));
+                    paciente.setClave(rs.getString("clave"));
+                    paciente.setNombre(rs.getString("nombre"));
+                    paciente.setFechaNacimiento(rs.getDate("fecha_nacimiento").toLocalDate());
+                    paciente.setTelefono(rs.getString("telefono"));
+                    paciente.setTipo("PACIENTE");
+                    return paciente;
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al buscar paciente: " + e.getMessage());
+        }
+
+        return null;
+    }
+
+    // ===== LISTAR TODOS =====
+    public List<Paciente> getTodos() {
+        List<Paciente> pacientes = new ArrayList<>();
+        String sql = "SELECT u.id, u.clave, p.nombre, p.fecha_nacimiento, p.telefono " +
+                "FROM usuarios u " +
+                "INNER JOIN pacientes p ON u.id = p.id " +
+                "WHERE u.tipo = 'PACIENTE' AND u.activo = TRUE " +
+                "ORDER BY p.nombre";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                Paciente paciente = new Paciente();
+                paciente.setId(rs.getString("id"));
+                paciente.setClave(rs.getString("clave"));
+                paciente.setNombre(rs.getString("nombre"));
+                paciente.setFechaNacimiento(rs.getDate("fecha_nacimiento").toLocalDate());
+                paciente.setTelefono(rs.getString("telefono"));
+                paciente.setTipo("PACIENTE");
+                pacientes.add(paciente);
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al listar pacientes: " + e.getMessage());
+        }
+
+        return pacientes;
+    }
+
+    // ===== ACTUALIZAR =====
+    public void actualizar(Paciente paciente) throws SQLException {
+        String sqlUsuario = "UPDATE usuarios SET clave = ? WHERE id = ?";
+        String sqlPaciente = "UPDATE pacientes SET nombre = ?, fecha_nacimiento = ?, " +
+                "telefono = ? WHERE id = ?";
+
+        Connection conn = null;
         try {
-            XMLHelper.guardar(ARCHIVO, new PacienteList(pacientes));
-        } catch (Exception e) {
-            System.err.println("Error al guardar pacientes: " + e.getMessage());
-            e.printStackTrace();
+            conn = DatabaseConnection.getConnection();
+            DatabaseConnection.beginTransaction();
+
+            // Actualizar usuarios
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlUsuario)) {
+                pstmt.setString(1, paciente.getClave());
+                pstmt.setString(2, paciente.getId());
+                pstmt.executeUpdate();
+            }
+
+            // Actualizar pacientes
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlPaciente)) {
+                pstmt.setString(1, paciente.getNombre());
+                pstmt.setDate(2, Date.valueOf(paciente.getFechaNacimiento()));
+                pstmt.setString(3, paciente.getTelefono());
+                pstmt.setString(4, paciente.getId());
+
+                int rowsAffected = pstmt.executeUpdate();
+                if (rowsAffected == 0) {
+                    throw new SQLException("No se encontró el paciente con ID: " + paciente.getId());
+                }
+            }
+
+            DatabaseConnection.commitTransaction();
+            System.out.println("✅ Paciente actualizado: " + paciente.getId());
+
+        } catch (SQLException e) {
+            DatabaseConnection.rollbackTransaction();
+            throw new SQLException("No se pudo actualizar el paciente: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Carga la lista de pacientes desde el archivo XML
-     * @return Lista de pacientes cargada o lista vacía si hay error
-     */
-    private List<Paciente> cargar() {
-        try {
-            PacienteList lista = XMLHelper.cargar(ARCHIVO, PacienteList.class);
-            return lista != null && lista.getPacientes() != null ? lista.getPacientes() : new ArrayList<>();
-        } catch (Exception e) {
-            System.out.println("No se pudo cargar la lista de pacientes. Iniciando con lista vacía.");
-            return new ArrayList<>();
+    // ===== ELIMINAR =====
+    public void eliminar(String id) throws SQLException {
+        // Soft delete: solo desactivar
+        String sql = "UPDATE usuarios SET activo = FALSE WHERE id = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, id);
+            int rowsAffected = pstmt.executeUpdate();
+
+            if (rowsAffected == 0) {
+                throw new SQLException("No se encontró el paciente con ID: " + id);
+            }
+
+            System.out.println("✅ Paciente desactivado: " + id);
+
+        } catch (SQLException e) {
+            throw new SQLException("No se pudo eliminar el paciente: " + e.getMessage(), e);
         }
+    }
+
+    // ===== BÚSQUEDA POR NOMBRE =====
+    public List<Paciente> buscarPorNombre(String nombre) {
+        List<Paciente> pacientes = new ArrayList<>();
+        String sql = "SELECT u.id, u.clave, p.nombre, p.fecha_nacimiento, p.telefono " +
+                "FROM usuarios u " +
+                "INNER JOIN pacientes p ON u.id = p.id " +
+                "WHERE u.tipo = 'PACIENTE' AND u.activo = TRUE " +
+                "AND p.nombre LIKE ? " +
+                "ORDER BY p.nombre";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, "%" + nombre + "%");
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Paciente paciente = new Paciente();
+                    paciente.setId(rs.getString("id"));
+                    paciente.setClave(rs.getString("clave"));
+                    paciente.setNombre(rs.getString("nombre"));
+                    paciente.setFechaNacimiento(rs.getDate("fecha_nacimiento").toLocalDate());
+                    paciente.setTelefono(rs.getString("telefono"));
+                    paciente.setTipo("PACIENTE");
+                    pacientes.add(paciente);
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al buscar pacientes por nombre: " + e.getMessage());
+        }
+
+        return pacientes;
     }
 }

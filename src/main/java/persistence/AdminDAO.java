@@ -1,116 +1,189 @@
 package persistence;
 
 import model.Admin;
-import util.XMLHelper;
-import java.io.File;
+import util.DatabaseConnection;
+
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Data Access Object (DAO) para gestionar la persistencia de administradores
- * Utiliza archivos XML para almacenar los datos
+ * DAO para gestionar los Administradores del sistema
  */
 public class AdminDAO {
-    private static final String ARCHIVO = "data/admins.xml";
-    private List<Admin> admins;
 
-    /**
-     * Constructor que inicializa el DAO y carga los datos existentes
-     * Crea el directorio data si no existe
-     */
-    public AdminDAO() {
-        // Crear directorio si no existe
-        new File("data").mkdirs();
-        admins = cargar();
-    }
+    // ===== AGREGAR =====
+    public void agregar(Admin admin) throws SQLException {
+        String sqlUsuario = "INSERT INTO usuarios (id, clave, tipo) VALUES (?, ?, 'ADMIN')";
+        String sqlAdmin = "INSERT INTO admins (id, nombre) VALUES (?, ?)";
 
-    /**
-     * Agrega un nuevo administrador al sistema
-     * @param admin Objeto Admin a agregar
-     * @throws IllegalArgumentException Si ya existe un administrador con el mismo ID
-     */
-    public void agregar(Admin admin) {
-        if (buscarPorId(admin.getId()) == null) {
-            admins.add(admin);
-            guardar();
-        } else {
-            throw new IllegalArgumentException("Ya existe un administrador con el ID: " + admin.getId());
-        }
-    }
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            DatabaseConnection.beginTransaction();
 
-    /**
-     * Busca un administrador por su ID
-     * @param id ID del administrador a buscar
-     * @return Objeto Admin encontrado o null si no existe
-     */
-    public Admin buscarPorId(String id) {
-        return admins.stream()
-                .filter(admin -> admin.getId().equalsIgnoreCase(id))
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * Obtiene todos los administradores del sistema
-     * @return Lista de todos los administradores (copia para evitar modificaciones externas)
-     */
-    public List<Admin> getTodos() {
-        return new ArrayList<>(admins); // Retorna copia para evitar modificaciones externas
-    }
-
-    /**
-     * Elimina un administrador por su ID
-     * @param id ID del administrador a eliminar
-     * @throws IllegalArgumentException Si no se encuentra un administrador con el ID especificado
-     */
-    public void eliminar(String id) {
-        boolean removido = admins.removeIf(admin -> admin.getId().equalsIgnoreCase(id));
-        if (removido) {
-            guardar();
-        } else {
-            throw new IllegalArgumentException("No se encontró un administrador con el ID: " + id);
-        }
-    }
-
-    /**
-     * Actualiza la información de un administrador existente
-     * @param nuevo Objeto Admin con la información actualizada
-     * @throws IllegalArgumentException Si no se encuentra un administrador con el ID especificado
-     */
-    public void actualizar(Admin nuevo) {
-        for (int i = 0; i < admins.size(); i++) {
-            if (admins.get(i).getId().equalsIgnoreCase(nuevo.getId())) {
-                admins.set(i, nuevo);
-                guardar();
-                return;
+            // Insertar en usuarios
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlUsuario)) {
+                pstmt.setString(1, admin.getId());
+                pstmt.setString(2, admin.getClave());
+                pstmt.executeUpdate();
             }
+
+            // Insertar en admins
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlAdmin)) {
+                pstmt.setString(1, admin.getId());
+                pstmt.setString(2, admin.getNombre());
+                pstmt.executeUpdate();
+            }
+
+            DatabaseConnection.commitTransaction();
+            System.out.println("✅ Admin agregado: " + admin.getId());
+
+        } catch (SQLException e) {
+            DatabaseConnection.rollbackTransaction();
+            throw new SQLException("No se pudo agregar el admin: " + e.getMessage(), e);
         }
-        throw new IllegalArgumentException("No se encontró un administrador con el ID: " + nuevo.getId());
     }
 
-    /**
-     * Guarda la lista de administradores en el archivo XML
-     */
-    private void guardar() {
+    // ===== BUSCAR POR ID =====
+    public Admin buscarPorId(String id) {
+        String sql = "SELECT u.id, u.clave, a.nombre " +
+                "FROM usuarios u INNER JOIN admins a ON u.id = a.id " +
+                "WHERE u.id = ? AND u.tipo = 'ADMIN'";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, id);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    Admin a = new Admin();
+                    a.setId(rs.getString("id"));
+                    a.setClave(rs.getString("clave"));
+                    a.setNombre(rs.getString("nombre"));
+                    a.setTipo("ADMIN");
+                    return a;
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al buscar admin: " + e.getMessage());
+        }
+
+        return null;
+    }
+
+    // ===== LISTAR TODOS =====
+    public List<Admin> getTodos() {
+        List<Admin> lista = new ArrayList<>();
+        String sql = "SELECT u.id, u.clave, a.nombre " +
+                "FROM usuarios u INNER JOIN admins a ON u.id = a.id " +
+                "WHERE u.tipo = 'ADMIN' AND u.activo = TRUE " +
+                "ORDER BY a.nombre";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                Admin a = new Admin();
+                a.setId(rs.getString("id"));
+                a.setClave(rs.getString("clave"));
+                a.setNombre(rs.getString("nombre"));
+                a.setTipo("ADMIN");
+                lista.add(a);
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al listar admins: " + e.getMessage());
+        }
+
+        return lista;
+    }
+
+    // ===== ACTUALIZAR =====
+    public void actualizar(Admin admin) throws SQLException {
+        String sqlUsuario = "UPDATE usuarios SET clave = ? WHERE id = ?";
+        String sqlAdmin = "UPDATE admins SET nombre = ? WHERE id = ?";
+
+        Connection conn = null;
         try {
-            XMLHelper.guardar(ARCHIVO, new AdminList(admins));
-        } catch (Exception e) {
-            System.err.println("Error al guardar administrador: " + e.getMessage());
-            e.printStackTrace();
+            conn = DatabaseConnection.getConnection();
+            DatabaseConnection.beginTransaction();
+
+            // Actualizar usuarios
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlUsuario)) {
+                pstmt.setString(1, admin.getClave());
+                pstmt.setString(2, admin.getId());
+                pstmt.executeUpdate();
+            }
+
+            // Actualizar admin
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlAdmin)) {
+                pstmt.setString(1, admin.getNombre());
+                pstmt.setString(2, admin.getId());
+                int rows = pstmt.executeUpdate();
+
+                if (rows == 0) throw new SQLException("No se encontró el admin con ID: " + admin.getId());
+            }
+
+            DatabaseConnection.commitTransaction();
+            System.out.println("✅ Admin actualizado: " + admin.getId());
+
+        } catch (SQLException e) {
+            DatabaseConnection.rollbackTransaction();
+            throw new SQLException("No se pudo actualizar el admin: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Carga la lista de administradores desde el archivo XML
-     * @return Lista de administradores cargada o lista vacía si hay error
-     */
-    private List<Admin> cargar() {
-        try {
-            AdminList lista = XMLHelper.cargar(ARCHIVO, AdminList.class);
-            return lista != null && lista.getAdmins() != null ? lista.getAdmins() : new ArrayList<>();
-        } catch (Exception e) {
-            System.out.println("No se pudo cargar la lista de administradores. Iniciando con lista vacía.");
-            return new ArrayList<>();
+    // ===== ELIMINAR =====
+    public void eliminar(String id) throws SQLException {
+        String sql = "UPDATE usuarios SET activo = FALSE WHERE id = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, id);
+            int rows = pstmt.executeUpdate();
+
+            if (rows == 0) throw new SQLException("No se encontró el admin con ID: " + id);
+
+            System.out.println("✅ Admin desactivado: " + id);
+
+        } catch (SQLException e) {
+            throw new SQLException("No se pudo eliminar el admin: " + e.getMessage(), e);
         }
+    }
+
+    // ===== BUSCAR POR NOMBRE =====
+    public List<Admin> buscarPorNombre(String nombre) {
+        List<Admin> lista = new ArrayList<>();
+        String sql = "SELECT u.id, u.clave, a.nombre " +
+                "FROM usuarios u INNER JOIN admins a ON u.id = a.id " +
+                "WHERE u.tipo = 'ADMIN' AND u.activo = TRUE AND a.nombre LIKE ? " +
+                "ORDER BY a.nombre";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, "%" + nombre + "%");
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Admin a = new Admin();
+                    a.setId(rs.getString("id"));
+                    a.setClave(rs.getString("clave"));
+                    a.setNombre(rs.getString("nombre"));
+                    a.setTipo("ADMIN");
+                    lista.add(a);
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al buscar admins por nombre: " + e.getMessage());
+        }
+
+        return lista;
     }
 }
